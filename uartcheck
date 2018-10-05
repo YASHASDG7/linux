@@ -1,0 +1,88 @@
+
+ #include <stdio.h>      // standard input / output functions
+#include <stdlib.h>
+#include <string.h>     // string function definitions
+#include <unistd.h>     // UNIX standard function definitions
+#include <fcntl.h>      // File control definitions
+#include <errno.h>      // Error number definitions
+#include <termios.h>    // POSIX terminal control definitions
+int fd;
+void uart_init()
+{
+ printf("\n +----------------------------------+");
+ printf("\n | CHECKING UART BY YASHAS...        |");
+ printf("\n +----------------------------------+");
+
+/*------------------------------- Opening the Serial Port -------------------------------*/
+
+  fd = open("/dev/ttyO0",O_RDWR | O_NOCTTY| O_SYNC);      /* !!blocks the read  */
+                                                            /* O_RDWR Read/Write access to serial port           */
+                                                            /* O_NOCTTY - No terminal will control the process   */
+                                                            /* O_NDELAY -Non Blocking Mode,Does not care about-  */
+                                                            /* -the status of DCD line,Open() returns immediatly */                                        
+
+ if(fd == -1)                                               /* Error Checking */
+  printf("\n  Error! in Opening ttyO0  ");
+ else
+  printf("\n  ttyUSB0 Opened Successfully ");
+
+
+ /*---------- Setting the Attributes of the serial port using termios structure --------- */
+
+struct termios SerialPortSettings;          /* Create the structure                          */
+
+tcgetattr(fd, &SerialPortSettings);         /* Get the current attributes of the Serial port */
+
+cfsetispeed(&SerialPortSettings,B19200);        /* Set Read  Speed as 19200                       */
+cfsetospeed(&SerialPortSettings,B19200);        /* Set Write Speed as 19200                       */
+
+SerialPortSettings.c_cflag &= ~PARENB;          /* Disables the Parity   Enable bit(PARENB),So No Parity   */
+SerialPortSettings.c_cflag &= ~CSTOPB;          /* CSTOPB = 2 Stop bits,here it is cleared so 1 Stop bit */
+SerialPortSettings.c_cflag &= ~CSIZE;           /* Clears the mask for setting the data size             */
+SerialPortSettings.c_cflag |=  CS8;             /* Set the data bits = 8                                 */
+
+SerialPortSettings.c_cflag &= ~CRTSCTS;         /* No Hardware flow Control                         */
+SerialPortSettings.c_cflag |= CREAD | CLOCAL;   /* Enable receiver,Ignore Modem Control lines       */ 
+
+
+SerialPortSettings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
+SerialPortSettings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode                            */
+
+SerialPortSettings.c_oflag &= ~OPOST;/*No Output Processing*/
+
+/* Setting Time outs */
+SerialPortSettings.c_cc[VMIN] = 10; /* Read at least 10 characters */
+SerialPortSettings.c_cc[VTIME] = 0; /* Wait indefinetly   */
+
+if((tcsetattr(fd,TCSANOW,&SerialPortSettings)) != 0) /* Set the attributes to the termios structure*/
+ printf("\n  ERROR ! in Setting attributes");
+else
+ printf("\n  BaudRate = 19200 \n  StopBits = 1 \n  Parity   = none");
+
+}
+void uart_receive()
+{
+ char read_buffer[32];   /* Buffer to store the data received              */
+ int  bytes_read = 0;    /* Number of bytes read by the read() system call */
+ int i = 0;
+
+ bytes_read = read(fd,&read_buffer,10); /* Read the data                   */
+ write(fd,&read_buffer,10);
+
+ printf("\n\n  Bytes Rxed %d", bytes_read); /* Print the number of bytes read */
+ printf("\n\n  ");
+
+ for(i=0;i<bytes_read;i++)   /*printing only the received characters*/
+ printf("%c",read_buffer[i]);
+
+ printf("\n +----------------------------------+\n\n\n");
+}
+void main(void)
+{ 
+  uart_init();
+  /*------------------------------- Write data to serial port -----------------------------*/
+  //uart_write_commande(write_buffer); //Write function works well
+  uart_receive();
+
+  close(fd);/* Close the Serial port */
+}
